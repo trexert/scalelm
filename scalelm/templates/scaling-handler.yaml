@@ -1,0 +1,21 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: "{{ .Release.Name }}-llm-scaling"
+spec:
+  scaleTargetRef:
+    apiVersion: "apps/v1"
+    kind: "Deployment"
+    name: "{{ .Release.Name }}-llms"
+  pollingInterval: 30
+  cooldownPeriod: 60
+  idleReplicaCount: 0
+  minReplicaCount: {{ .Values.autoscaling.minReplicas }}
+  maxReplicaCount: {{ .Values.autoscaling.maxReplicas }}
+  triggers:
+    - type: "rabbitmq"
+      metadata:
+        mode: "QueueLength"
+        value: 2
+        queueName: "{{ .Release.Name }}-llm-request-queue"
+        unsafeSsl: true
