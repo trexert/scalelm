@@ -1,0 +1,22 @@
+apiVersion: "apps/v1"
+kind: "Deployment"
+metadata:
+  name: "{{ .Release.Name }}-llms"
+  labels:
+    app: "llm"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: "llm"
+  template:
+    metadata:
+      labels:
+        app: "llm"
+    spec:
+      containers:
+      - name: "{{ .Release.Name }}-llms"
+        image: "{{ .Values.llmImage.repository }}/{{ .Values.llmImage.imageName }}:{{ .Values.llmImage.tag }}"
+        imagePullPolicy: {{ .Values.llmImage.pullPolicy | quote }}
+        ports:
+          - containerPort: 11434
