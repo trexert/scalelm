@@ -6,8 +6,14 @@ use amqprs::{
     connection::{Connection, OpenConnectionArguments},
 };
 use anyhow::ensure;
+use serde::{Deserialize, Serialize};
+use tracing::trace;
 
+pub const EXCHANGE: &str = "amq.topic";
+
+/// Setup an initial connection to the RabbitMQ server.
 pub async fn setup_connection(config: &ConnectionConfig) -> anyhow::Result<Connection> {
+    trace!("setup_connection");
     let connection = Connection::open(&OpenConnectionArguments::new(
         &config.host,
         config.port,
@@ -23,7 +29,9 @@ pub async fn setup_connection(config: &ConnectionConfig) -> anyhow::Result<Conne
     Ok(connection)
 }
 
+/// Open a channel to the RabbitMQ server.
 pub async fn setup_channel(connection: &Connection) -> anyhow::Result<Channel> {
+    trace!("setup_channel");
     let channel = connection.open_channel(None).await?;
 
     channel.register_callback(DefaultChannelCallback).await?;
@@ -31,9 +39,19 @@ pub async fn setup_channel(connection: &Connection) -> anyhow::Result<Channel> {
     Ok(channel)
 }
 
-pub async fn setup_queue(channel: &Channel, queue_name: &str, exclusive: bool) -> anyhow::Result<()> {
+/// Create a queue if it doesn't exist, then bind to it.
+pub async fn setup_queue(
+    channel: &Channel,
+    queue_name: &str,
+    exclusive: bool,
+) -> anyhow::Result<()> {
+    trace!("setup_queue");
     let (created_queue_name, _, _) = channel
-        .queue_declare(QueueDeclareArguments::new(queue_name).exclusive(exclusive).finish())
+        .queue_declare(
+            QueueDeclareArguments::new(queue_name)
+                .exclusive(exclusive)
+                .finish(),
+        )
         .await?
         .unwrap();
 
@@ -43,13 +61,8 @@ pub async fn setup_queue(channel: &Channel, queue_name: &str, exclusive: bool) -
     );
 
     channel
-        .queue_bind(QueueBindArguments::new(
-            &queue_name,
-            "amq.topic",
-            &queue_name,
-        ))
-        .await
-        .unwrap();
+        .queue_bind(QueueBindArguments::new(&queue_name, EXCHANGE, &queue_name))
+        .await?;
 
     Ok(())
 }
@@ -84,4 +97,14 @@ impl ConnectionConfig {
             jobs_queue_name,
         })
     }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct RequestMessage {
+    pub prompt: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ResponseMessage {
+    pub response: String,
 }

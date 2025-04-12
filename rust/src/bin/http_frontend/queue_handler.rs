@@ -9,7 +9,9 @@ use amqprs::{
 };
 use anyhow::Context;
 use async_trait::async_trait;
-use scalelm::{ConnectionConfig, setup_channel, setup_connection, setup_queue};
+use scalelm::{
+    ConnectionConfig, EXCHANGE, RequestMessage, setup_channel, setup_connection, setup_queue,
+};
 use tokio::{
     sync::{Mutex, oneshot},
     time::timeout,
@@ -86,14 +88,17 @@ impl QueueHandler {
             .with_persistence(true)
             .with_reply_to(&self.response_queue_name)
             .with_timestamp(chrono::Utc::now().timestamp_millis() as u64)
-            // .with_user_id("guest")
             .finish();
-        let publish_args = BasicPublishArguments::new("amq.topic", &self.jobs_queue_name);
+        let publish_args = BasicPublishArguments::new(EXCHANGE, &self.jobs_queue_name);
+
+        let message_content = RequestMessage {
+            prompt: prompt.to_string(),
+        };
 
         self.channel
             .basic_publish(
                 publish_properties.clone(),
-                prompt.to_string().into_bytes(),
+                serde_json::to_string(&message_content)?.into(),
                 publish_args.clone(),
             )
             .await?;
@@ -112,6 +117,8 @@ impl QueueHandler {
         let args = BasicConsumeArguments::default()
             .queue(self.response_queue_name.clone())
             .exclusive(true)
+            // We won't have anything else trying to handle this message if we die, so may as well ack as soon as we receive the message.
+            .auto_ack(true)
             .finish();
         let _consumer_id = self.channel.basic_consume(self.clone(), args).await?;
         Ok(())
@@ -146,7 +153,7 @@ impl AsyncConsumer for QueueHandler {
         tx.send(content).unwrap_or_else(|e| {
             warn!(
                 correlation_id = correlation_id,
-                "Hit error sending response on internal channel {:?}", e
+                "Hit error sending response on internal channel: {:?}", e
             );
             return;
         });

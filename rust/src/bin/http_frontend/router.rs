@@ -34,11 +34,11 @@ async fn generate(
         Err(e) => {
             warn!(
                 correlation_id = correlation_id,
-                "Returning error response caused by {:?}", e
+                "Returning error response caused by:\n{:?}", e
             );
             (
                 StatusCode::BAD_GATEWAY,
-                "Error generating llm response".to_string(),
+                "Error generating llm response\n".to_string(),
             )
         }
     }

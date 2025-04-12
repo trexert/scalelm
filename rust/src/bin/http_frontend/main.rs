@@ -3,7 +3,7 @@ mod router;
 
 use queue_handler::QueueHandler;
 use tokio::sync::Notify;
-use tracing::error;
+use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
@@ -16,18 +16,21 @@ async fn main() {
         .try_init()
         .unwrap();
 
-    if let Err(e) = start_server().await {
-        error!("Failed to start http endpoint: \n{:?}", e)
-    } else {
-        let guard = Notify::new();
-        guard.notified().await;
-        error!("Fallen server process finished unexpectedly");
+    match start_server().await {
+        Ok(_queue_handler) => {
+            info!("Successfully started http frontend. Listening forever");
+            let guard = Notify::new();
+            guard.notified().await;
+            error!("Http frontend process finished unexpectedly");
+        }
+        Err(e) => error!("Failed to start http frontend: \n{:?}", e),
     }
 }
 
-async fn start_server() -> anyhow::Result<()> {
+/// Starts server, retaining a reference to the queue handler so we don't drop the connection.
+async fn start_server() -> anyhow::Result<QueueHandler> {
     let queue_handler = QueueHandler::new().await?;
     queue_handler.listen_for_responses().await?;
-    router::serve_routes(queue_handler).await?;
-    Ok(())
+    router::serve_routes(queue_handler.clone()).await?;
+    Ok(queue_handler)
 }
