@@ -20,11 +20,15 @@ async fn main() {
         .with(EnvFilter::from_default_env())
         .try_init()
         .ok();
+    listen_forever(&channel, &config).await.unwrap();
+}
 
+async fn setup_server() -> anyhow::Result<()> {
     let config = ConnectionConfig::from_env().unwrap();
     let connection = setup_connection(&config).await.unwrap();
-    let channel = setup_channel(&connection, &config).await.unwrap();
-    listen_forever(&channel, &config).await.unwrap();
+    let channel = setup_channel(&connection).await.unwrap();
+
+    Ok(())
 }
 
 async fn listen_forever(channel: &Channel, config: &ConnectionConfig) -> anyhow::Result<()> {
