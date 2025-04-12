@@ -4,3 +4,4 @@
 - No useful runtime error detection
 - limited automated testing
 - Could neaten up dependencies for smaller binaries
+- Make it possible to send error responses from llm handler to http frontend

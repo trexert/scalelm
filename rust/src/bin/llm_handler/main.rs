@@ -81,17 +81,11 @@ impl QueueHandler {
         &self,
         correlation_id: &str,
         channel: &Channel,
-        deliver: &Deliver,
         basic_properties: &BasicProperties,
         content: &[u8],
     ) -> anyhow::Result<()> {
         trace!("handle_request");
-        let content_string = str::from_utf8(content)?;
-        info!(
-            correlation_id = correlation_id,
-            "Received content {}", content_string
-        );
-        let request_message: RequestMessage = serde_json::from_str(content_string)?;
+        let request_message: RequestMessage = serde_json::from_slice(content)?;
         let reply_to = basic_properties
             .reply_to()
             .ok_or(anyhow!("Missing 'reply_to' in message"))?;
@@ -140,13 +134,7 @@ impl AsyncConsumer for QueueHandler {
         info!(correlation_id = correlation_id, "Received job message");
 
         if let Err(e) = self
-            .handle_request(
-                correlation_id,
-                channel,
-                &deliver,
-                &basic_properties,
-                &content,
-            )
+            .handle_request(correlation_id, channel, &basic_properties, &content)
             .await
         {
             warn!(

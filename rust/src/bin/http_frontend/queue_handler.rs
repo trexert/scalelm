@@ -10,7 +10,8 @@ use amqprs::{
 use anyhow::Context;
 use async_trait::async_trait;
 use scalelm::{
-    ConnectionConfig, EXCHANGE, RequestMessage, setup_channel, setup_connection, setup_queue,
+    ConnectionConfig, EXCHANGE, RequestMessage, ResponseMessage, setup_channel, setup_connection,
+    setup_queue,
 };
 use tokio::{
     sync::{Mutex, oneshot},
@@ -18,7 +19,7 @@ use tokio::{
 };
 use tracing::{debug, warn};
 
-const MESSAGE_TIMEOUT: Duration = Duration::from_secs(15);
+const MESSAGE_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[derive(Clone)]
 pub struct QueueHandler {
@@ -108,7 +109,8 @@ impl QueueHandler {
         // Allow double message timeout for time waiting in queue,
         //  and then processing time.
         let response = timeout(MESSAGE_TIMEOUT * 2, rx).await??;
-        Ok(String::from_utf8(response)?)
+        let response_message: ResponseMessage = serde_json::from_slice(&response)?;
+        Ok(response_message.response)
     }
 
     /// Register a consumer on our response queue.
