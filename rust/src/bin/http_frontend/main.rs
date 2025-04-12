@@ -28,5 +28,6 @@ async fn main() {
 async fn start_server() -> anyhow::Result<()> {
     let queue_handler = QueueHandler::new().await?;
     queue_handler.listen_for_responses().await?;
-    router::serve_routes(queue_handler).await
+    router::serve_routes(queue_handler).await?;
+    Ok(())
 }

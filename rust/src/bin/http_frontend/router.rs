@@ -11,7 +11,9 @@ pub async fn serve_routes(queue_handler: QueueHandler) -> anyhow::Result<()> {
         .with_state(ServerState { queue_handler });
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
-    Ok(axum::serve(listener, app).await?)
+    axum::serve(listener, app).await?;
+
+    Ok(())
 }
 
 async fn generate(
