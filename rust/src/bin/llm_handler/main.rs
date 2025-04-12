@@ -1,3 +1,5 @@
+mod ollama_handler;
+
 use std::str;
 
 use amqprs::{
@@ -10,6 +12,7 @@ use amqprs::{
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
+use ollama_handler::OllamaHandler;
 use scalelm::{
     ConnectionConfig, EXCHANGE, RequestMessage, ResponseMessage, setup_channel, setup_connection,
     setup_queue,
@@ -53,23 +56,29 @@ async fn setup_listener() -> anyhow::Result<QueueHandler> {
     let consume_args = BasicConsumeArguments::default()
         .queue(config.jobs_queue_name.clone())
         .finish();
-    channel.basic_consume(Consumer {}, consume_args).await?;
+    let ollama_handler = OllamaHandler::new()?;
+    let queue_handler = QueueHandler {
+        _connection: connection.clone(),
+        _channel: channel.clone(),
+        ollama_handler,
+    };
+    channel
+        .basic_consume(queue_handler.clone(), consume_args)
+        .await?;
 
-    Ok(QueueHandler {
-        _connection: connection,
-        _channel: channel,
-    })
+    Ok(queue_handler)
 }
 
+#[derive(Clone)]
 struct QueueHandler {
     _connection: Connection,
     _channel: Channel,
+    ollama_handler: OllamaHandler,
 }
 
-struct Consumer {}
-
-impl Consumer {
+impl QueueHandler {
     async fn handle_request(
+        &self,
         correlation_id: &str,
         channel: &Channel,
         deliver: &Deliver,
@@ -87,16 +96,17 @@ impl Consumer {
             .reply_to()
             .ok_or(anyhow!("Missing 'reply_to' in message"))?;
 
-        reqwest::
+        let response = self
+            .ollama_handler
+            .make_generate_request(&request_message.prompt)
+            .await?;
 
         let publish_properties = BasicProperties::default()
             .with_content_type("application/json")
             .with_correlation_id(correlation_id)
             .with_timestamp(chrono::Utc::now().timestamp_millis() as u64)
             .finish();
-        let message_content = ResponseMessage {
-            response: "Handled message".to_string(),
-        };
+        let message_content = ResponseMessage { response };
         channel
             .basic_publish(
                 publish_properties,
@@ -104,22 +114,13 @@ impl Consumer {
                 BasicPublishArguments::new(EXCHANGE, reply_to),
             )
             .await?;
-        channel
-            .basic_ack(BasicAckArguments::new(deliver.delivery_tag(), false))
-            .await
-            .unwrap_or_else(|e| {
-                warn!(
-                    correlation_id = correlation_id,
-                    "Hit error acking that we've handled message {:?}", e
-                )
-            });
 
         Ok(())
     }
 }
 
 #[async_trait]
-impl AsyncConsumer for Consumer {
+impl AsyncConsumer for QueueHandler {
     async fn consume(
         &mut self,
         channel: &Channel,
@@ -138,18 +139,19 @@ impl AsyncConsumer for Consumer {
         };
         info!(correlation_id = correlation_id, "Received job message");
 
-        if let Err(e) = Self::handle_request(
-            correlation_id,
-            channel,
-            &deliver,
-            &basic_properties,
-            &content,
-        )
-        .await
+        if let Err(e) = self
+            .handle_request(
+                correlation_id,
+                channel,
+                &deliver,
+                &basic_properties,
+                &content,
+            )
+            .await
         {
             warn!(
                 correlation_id = correlation_id,
-                "Error handling llm request {:?}", e
+                "Error handling llm request: \n{:?}", e
             );
         } else {
             info!(
@@ -157,5 +159,15 @@ impl AsyncConsumer for Consumer {
                 "Successfully handled llm request"
             );
         }
+
+        channel
+            .basic_ack(BasicAckArguments::new(deliver.delivery_tag(), false))
+            .await
+            .unwrap_or_else(|e| {
+                warn!(
+                    correlation_id = correlation_id,
+                    "Hit error acking that we've handled message {:?}", e
+                )
+            });
     }
 }
