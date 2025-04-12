@@ -78,28 +78,25 @@ impl Consumer {
     ) -> anyhow::Result<()> {
         trace!("handle_request");
         let content_string = str::from_utf8(content)?;
-
         info!(
             correlation_id = correlation_id,
             "Received content {}", content_string
         );
-
         let request_message: RequestMessage = serde_json::from_str(content_string)?;
-
         let reply_to = basic_properties
             .reply_to()
             .ok_or(anyhow!("Missing 'reply_to' in message"))?;
+
+        reqwest::
 
         let publish_properties = BasicProperties::default()
             .with_content_type("application/json")
             .with_correlation_id(correlation_id)
             .with_timestamp(chrono::Utc::now().timestamp_millis() as u64)
             .finish();
-
         let message_content = ResponseMessage {
             response: "Handled message".to_string(),
         };
-
         channel
             .basic_publish(
                 publish_properties,
@@ -107,7 +104,6 @@ impl Consumer {
                 BasicPublishArguments::new(EXCHANGE, reply_to),
             )
             .await?;
-
         channel
             .basic_ack(BasicAckArguments::new(deliver.delivery_tag(), false))
             .await

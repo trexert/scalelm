@@ -3,3 +3,4 @@
 - Logging could be nicer
 - No useful runtime error detection
 - limited automated testing
+- Could neaten up dependencies for smaller binaries
