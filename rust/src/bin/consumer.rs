@@ -6,7 +6,7 @@ use amqprs::{
     }, connection::Connection, consumer::{AsyncConsumer, BlockingConsumer, DefaultConsumer}, BasicProperties, Deliver
 };
 use anyhow::bail;
-use scalelm::{ConnectionConfig, setup_connection, setup_jobs_channel};
+use scalelm::{ConnectionConfig, setup_connection, setup_channel};
 use tokio::sync::Notify;
 use tracing::warn;
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
@@ -23,7 +23,7 @@ async fn main() {
 
     let config = ConnectionConfig::from_env().unwrap();
     let connection = setup_connection(&config).await.unwrap();
-    let channel = setup_jobs_channel(&connection, &config).await.unwrap();
+    let channel = setup_channel(&connection, &config).await.unwrap();
     listen_forever(&channel, &config).await.unwrap();
 }
 

@@ -1,24 +1,17 @@
-use std::sync::Arc;
-
-use amqprs::{channel::Channel, connection::Connection};
 use axum::{Json, Router, extract::State, http::StatusCode, routing::post};
-use scalelm::ConnectionConfig;
 use serde::Deserialize;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-use crate::queue_handler::{self, QueueHandler};
+use crate::queue_handler::QueueHandler;
 
-async fn serve_routes() {
+pub async fn serve_routes(queue_handler: QueueHandler) -> anyhow::Result<()> {
     let app = Router::new()
-        // .route("/", get(root))
         .route("/api/generate", post(generate))
-        .with_state(ServerState {
-            queue_handler: QueueHandler {},
-        });
+        .with_state(ServerState { queue_handler });
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
+    Ok(axum::serve(listener, app).await?)
 }
 
 async fn generate(
@@ -32,10 +25,8 @@ async fn generate(
         .await
     {
         Ok(response) => {
-            debug!(
-                correlation_id = correlation_id,
-                "Returning OK response {}", response
-            );
+            info!(correlation_id = correlation_id, "Returning OK response");
+            debug!(correlation_id = correlation_id, "Response: {}", response);
             (StatusCode::OK, response)
         }
         Err(e) => {
@@ -45,7 +36,7 @@ async fn generate(
             );
             (
                 StatusCode::BAD_GATEWAY,
-                "Error generating response".to_string(),
+                "Error generating llm response".to_string(),
             )
         }
     }
@@ -58,5 +49,5 @@ struct GenerateArgs {
 
 #[derive(Clone)]
 struct ServerState {
-    queue_handler: Arc<QueueHandler>,
+    queue_handler: QueueHandler,
 }

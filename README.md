@@ -1,1 +1,4 @@
 - No TLS
+- No graceful scale down
+- Logging could be nicer
+- No useful runtime error detection

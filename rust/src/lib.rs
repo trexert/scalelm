@@ -23,31 +23,35 @@ pub async fn setup_connection(config: &ConnectionConfig) -> anyhow::Result<Conne
     Ok(connection)
 }
 
-pub async fn setup_jobs_channel(
-    connection: &Connection,
-    config: &ConnectionConfig,
-) -> anyhow::Result<Channel> {
+pub async fn setup_channel(connection: &Connection) -> anyhow::Result<Channel> {
     let channel = connection.open_channel(None).await?;
 
     channel.register_callback(DefaultChannelCallback).await?;
 
-    let (jobs_queue_name, _, _) = channel
-        .queue_declare(QueueDeclareArguments::new(&config.jobs_queue_name))
+    Ok(channel)
+}
+
+pub async fn setup_queue(channel: &Channel, queue_name: &str, exclusive: bool) -> anyhow::Result<()> {
+    let (created_queue_name, _, _) = channel
+        .queue_declare(QueueDeclareArguments::new(queue_name).exclusive(exclusive).finish())
         .await?
         .unwrap();
 
-    ensure!(jobs_queue_name == config.jobs_queue_name);
+    ensure!(
+        created_queue_name == queue_name,
+        "Created queue must have the configured name",
+    );
 
     channel
         .queue_bind(QueueBindArguments::new(
-            &jobs_queue_name,
+            &queue_name,
             "amq.topic",
-            &jobs_queue_name,
+            &queue_name,
         ))
         .await
         .unwrap();
 
-    Ok(channel)
+    Ok(())
 }
 
 #[derive(Clone)]
