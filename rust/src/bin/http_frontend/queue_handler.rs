@@ -1,5 +1,5 @@
 use core::str;
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, env, sync::Arc, time::Duration};
 
 use amqprs::{
     BasicProperties, Deliver,
@@ -7,6 +7,7 @@ use amqprs::{
     connection::Connection,
     consumer::AsyncConsumer,
 };
+use anyhow::Context;
 use async_trait::async_trait;
 use scalelm::{
     ConnectionConfig, EXCHANGE, RequestMessage, ResponseMessage, setup_channel, setup_connection,
@@ -19,8 +20,6 @@ use tokio::{
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-const MESSAGE_TIMEOUT: Duration = Duration::from_secs(30);
-
 #[derive(Clone)]
 pub struct QueueHandler {
     _connection: Connection,
@@ -28,6 +27,7 @@ pub struct QueueHandler {
     jobs_queue_name: String,
     response_queue_name: String,
     waiting_for_responses: Arc<Mutex<HashMap<String, oneshot::Sender<Vec<u8>>>>>,
+    timeout: Duration,
 }
 
 impl QueueHandler {
@@ -45,12 +45,17 @@ impl QueueHandler {
 
         let waiting_for_responses = Arc::new(Mutex::new(HashMap::new()));
 
+        let timeout_str = env::var("REQUEST_TIMEOUT").with_context(|| "Error getting timeout")?;
+        let timeout_int = timeout_str.parse()?;
+        let timeout = Duration::from_secs(timeout_int);
+
         Ok(Self {
             _connection: connection,
             channel,
             jobs_queue_name,
             response_queue_name,
             waiting_for_responses,
+            timeout,
         })
     }
 
@@ -86,7 +91,7 @@ impl QueueHandler {
         let publish_properties = BasicProperties::default()
             .with_content_type("application/json")
             .with_correlation_id(correlation_id)
-            .with_expiration(&MESSAGE_TIMEOUT.as_millis().to_string())
+            .with_expiration(&self.timeout.as_millis().to_string())
             .with_persistence(true)
             .with_reply_to(&self.response_queue_name)
             .with_timestamp(chrono::Utc::now().timestamp_millis() as u64)
@@ -109,7 +114,7 @@ impl QueueHandler {
 
         // Allow double message timeout for time waiting in queue,
         //  and then processing time.
-        let response = timeout(MESSAGE_TIMEOUT * 2, rx).await??;
+        let response = timeout(self.timeout * 2, rx).await??;
         let response_message: ResponseMessage = serde_json::from_slice(&response)?;
         Ok(response_message.response)
     }

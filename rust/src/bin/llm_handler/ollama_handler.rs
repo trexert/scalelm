@@ -1,33 +1,40 @@
-use std::time::Duration;
+use std::{env, time::Duration};
 
-use reqwest::Client;
+use anyhow::Context;
+use reqwest_middleware::ClientWithMiddleware;
+use reqwest_retry::{RetryTransientMiddleware, policies::ExponentialBackoff};
 use serde::{Deserialize, Serialize};
-use tracing::warn;
+use tracing::debug;
 
-const GENERATE_URL: &str = "http://localhost:11434/api/generate";
-const TIMEOUT: Duration = Duration::from_secs(20);
+const GENERATE_PATH: &str = "/api/generate";
 
 #[derive(Clone)]
 pub struct OllamaHandler {
-    http_client: Client,
+    client: ClientWithMiddleware,
+    config: OllamaConfig,
 }
 
 impl OllamaHandler {
     pub fn new() -> anyhow::Result<Self> {
-        let http_client = reqwest::Client::builder().timeout(TIMEOUT).build()?;
-        Ok(Self { http_client })
+        let config = OllamaConfig::from_env()?;
+        let retry_policy = ExponentialBackoff::builder().build_with_max_retries(5);
+        let raw_client = reqwest::Client::builder().timeout(config.timeout).build()?;
+        let client = reqwest_middleware::ClientBuilder::new(raw_client)
+            .with(RetryTransientMiddleware::new_with_policy(retry_policy))
+            .build();
+        Ok(Self { client, config })
     }
 
     pub async fn make_generate_request(&self, prompt: &str) -> anyhow::Result<String> {
-        let body = RequestBody::new(prompt);
+        let body = RequestBody::new(&self.config.model, prompt);
         let result = self
-            .http_client
-            .post(GENERATE_URL)
+            .client
+            .post(format!("{}{}", &self.config.host, GENERATE_PATH))
             .body(serde_json::to_string(&body)?)
             .send()
             .await?;
         let response_text = &result.text().await?;
-        warn!("response text: {}", response_text);
+        debug!("Got response from ollama container: {}", response_text);
         let response_body: ResponseBody = serde_json::from_str(&response_text)?;
         Ok(response_body.response)
     }
@@ -41,9 +48,9 @@ struct RequestBody {
 }
 
 impl RequestBody {
-    fn new(prompt: &str) -> Self {
+    fn new(model: &str, prompt: &str) -> Self {
         Self {
-            model: "gemma3:1b".to_string(),
+            model: model.to_string(),
             prompt: prompt.to_string(),
             stream: false,
         }
@@ -63,4 +70,27 @@ struct ResponseBody {
     eval_count: u32,
     prompt_eval_duration: u64,
     eval_duration: u64,
+}
+
+#[derive(Clone)]
+struct OllamaConfig {
+    host: String,
+    model: String,
+    timeout: Duration,
+}
+
+impl OllamaConfig {
+    fn from_env() -> anyhow::Result<Self> {
+        let host = env::var("OLLAMA_HOST").with_context(|| "Error getting ollama host")?;
+        let model = env::var("OLLAMA_MODEL").with_context(|| "Error getting ollama model")?;
+        let timeout_str = env::var("REQUEST_TIMEOUT").with_context(|| "Error getting timeout")?;
+        let timeout_int = timeout_str.parse()?;
+        let timeout = Duration::from_secs(timeout_int);
+
+        Ok(Self {
+            host,
+            model,
+            timeout,
+        })
+    }
 }

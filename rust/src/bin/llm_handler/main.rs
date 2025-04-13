@@ -48,17 +48,18 @@ async fn setup_listener() -> anyhow::Result<QueueHandler> {
     let config = ConnectionConfig::from_env()?;
     info!("Got config: {:?}", config);
 
+    let ollama_handler = OllamaHandler::new()?;
+
     let connection = setup_connection(&config).await?;
     let channel = setup_channel(&connection).await?;
-    setup_queue(&channel, &config.jobs_queue_name, false).await?;
     channel
         .basic_qos(BasicQosArguments::default().prefetch_count(1).finish())
         .await?;
+    setup_queue(&channel, &config.jobs_queue_name, false).await?;
 
     let consume_args = BasicConsumeArguments::default()
         .queue(config.jobs_queue_name.clone())
         .finish();
-    let ollama_handler = OllamaHandler::new()?;
     let queue_handler = QueueHandler {
         _connection: connection.clone(),
         _channel: channel.clone(),
@@ -141,13 +142,10 @@ impl AsyncConsumer for QueueHandler {
         {
             warn!(
                 correlation_id = correlation_id,
-                "Error handling llm request: \n{:?}", e
+                "Error handling job: \n{:?}", e
             );
         } else {
-            info!(
-                correlation_id = correlation_id,
-                "Successfully handled llm request"
-            );
+            info!(correlation_id = correlation_id, "Successfully handled job");
         }
 
         channel

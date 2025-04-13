@@ -1,33 +1,34 @@
-# Default values for scalelm.
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
-
-# This sets the container image more information can be found here: https://kubernetes.io/docs/concepts/containers/images/
 images:
-  llmImage: "ollama-gemma3-1b:latest"
+  llmImage: "ollama-qwen25-05b:latest"
   llmHandlerImage: "llm_handler:latest"
   httpFrontendImage: "http_frontend:latest"
   pullPolicy: IfNotPresent
 
-# This section is for setting up autoscaling more information can be found here: https://kubernetes.io/docs/concepts/workloads/autoscaling/
 autoscaling:
-  minReplicas: 0
-  maxReplicas: 3
+  fallbackReplicas: 4
+  minReplicas: 1
+  maxReplicas: 10
+  messages_per_llm_pod: 1
 
 general_config:
-  log_level: TRACE
-  jobs_queue_suffix: "-jobs-queue"
+  log_level: INFO
+  jobs_queue_name: "jobs-queue"
+  request_timeout: 60
 
-# This is for setting up a service more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/
+llms:
+  host: "http://localhost:11434"
+  model: "qwen2.5:0.5b"
+  cpu_request: 1.5
+  memory_request: 1G
+  cpu_limit: 2 # Capped at 2 for the sake of making autoscaling useful in small deployments
+
 service:
-  # This sets the service type more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
   type: NodePort
-  # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
   port: 30434
   internal_port: 43196
 
 rabbitmq:
-  # replicaCount: 3
+  replicaCount: 3
   auth:
     username: "default-user"
     password: "eMs6lx9eoo0ntPob"
@@ -35,29 +36,8 @@ rabbitmq:
   service:
     type: "ClusterIP"
     clusterIP: "10.108.9.161"
-
-resources:
-  {}
-  # We usually recommend not to specify default resources and to leave this as a conscious
-  # choice for the user. This also increases chances charts run on environments with little
-  # resources, such as Minikube. If you do want to specify resources, uncomment the following
-  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
-  # limits:
-  #   cpu: 100m
-  #   memory: 128Mi
-  # requests:
-  #   cpu: 100m
-  #   memory: 128Mi
-
-# This is to setup the liveness and readiness probes more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
-# livenessProbe:
-#   httpGet:
-#     path: /
-#     port: http
-# readinessProbe:
-#   httpGet:
-#     path: /
-#     port: http
+  persistence:
+    enabled: false
 
 # This is for setting Kubernetes Annotations to a Pod.
 # For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
@@ -65,16 +45,3 @@ podAnnotations: {}
 # This is for setting Kubernetes Labels to a Pod.
 # For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
 podLabels: {}
-
-podSecurityContext:
-  {}
-  # fsGroup: 2000
-
-securityContext:
-  {}
-  # capabilities:
-  #   drop:
-  #   - ALL
-  # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000

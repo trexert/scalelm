@@ -46,7 +46,7 @@ async fn generate(
                 "Returning error response caused by:\n{:?}", e
             );
             (
-                StatusCode::BAD_GATEWAY,
+                StatusCode::INTERNAL_SERVER_ERROR,
                 Json(GenerateResponse::Error(
                     "Error generating llm response\n".to_string(),
                 )),

@@ -30,7 +30,9 @@ spec:
               value: {{ .Values.rabbitmq.auth.username | quote }}
             - name: "RABBITMQ_CONNECTION_PASS"
               value: {{ .Values.rabbitmq.auth.password | quote }}
-            - name: "JOBS_QUEUE_NAME"
-              value: "{{ .Release.Name }}{{ .Values.general_config.jobs_queue_suffix }}"
+            - name: "RABBITMQ_JOBS_QUEUE"
+              value: {{ .Values.general_config.jobs_queue_name | quote }}
+            - name: "REQUEST_TIMEOUT"
+              value: {{ .Values.general_config.request_timeout | quote }}
             - name: "RUST_LOG"
               value: {{ .Values.general_config.log_level | quote }}

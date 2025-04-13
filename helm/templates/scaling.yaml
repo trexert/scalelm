@@ -1,0 +1,29 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: "{{ .Release.Name }}-llm-scaling"
+spec:
+  scaleTargetRef:
+    name: "{{ .Release.Name }}-llms"
+  pollingInterval: 30
+  cooldownPeriod: 300
+  idleReplicaCount: 0 
+  minReplicaCount: {{ .Values.autoscaling.minReplicas }}
+  maxReplicaCount: {{ .Values.autoscaling.maxReplicas }}
+  # fallback:
+  #   failureThreshold: 3
+  #   replicas: {{ .Values.autoscaling.fallbackReplicas }}
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 300
+  triggers:
+  - type: rabbitmq
+    metadata:
+      host: "http://{{ .Values.rabbitmq.auth.username }}:{{ .Values.rabbitmq.auth.password }}@{{ .Values.rabbitmq.service.clusterIP }}:{{ .Values.rabbitmq.containerPorts.manager }}/"
+      protocol: auto
+      mode: QueueLength
+      value: {{ .Values.autoscaling.messages_per_llm_pod | quote }}
+      queueName: {{ .Values.general_config.jobs_queue_name | quote }}
+      unsafeSsl: "true"

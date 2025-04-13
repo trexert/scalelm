@@ -27,6 +27,3 @@ dependencies:
   - name: "rabbitmq"
     repository: "https://charts.bitnami.com/bitnami"
     version: "15.4.2"
-  - name: "rabbitmq-cluster-operator"
-    repository: "https://charts.bitnami.com/bitnami"
-    version: "4.4.7"

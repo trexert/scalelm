@@ -5,7 +5,7 @@ use amqprs::{
     channel::{Channel, QueueBindArguments, QueueDeclareArguments},
     connection::{Connection, OpenConnectionArguments},
 };
-use anyhow::ensure;
+use anyhow::{Context, ensure};
 use serde::{Deserialize, Serialize};
 use tracing::trace;
 
@@ -57,7 +57,9 @@ pub async fn setup_queue(
 
     ensure!(
         created_queue_name == queue_name,
-        "Created queue must have the configured name",
+        "Created queue must have the configured name. Configured - {}, Created - {}",
+        queue_name,
+        created_queue_name,
     );
 
     channel
@@ -78,17 +80,17 @@ pub struct ConnectionConfig {
 
 impl ConnectionConfig {
     pub fn from_env() -> anyhow::Result<Self> {
-        let host = env::var("RABBITMQ_CONNECTION_HOST").unwrap_or("localhost".to_string());
-        // .with_context(|| "Error getting connection host")?;
-        let port_string = env::var("RABBITMQ_CONNECTION_PORT").unwrap_or("5672".to_string());
-        // .with_context(|| "Error getting connection port")?;
+        let host = env::var("RABBITMQ_CONNECTION_HOST")
+            .with_context(|| "Error getting connection host")?;
+        let port_string = env::var("RABBITMQ_CONNECTION_PORT")
+            .with_context(|| "Error getting connection port")?;
         let port = port_string.parse()?;
-        let user = env::var("RABBITMQ_CONNECTION_USER").unwrap_or("guest".to_string());
-        // .with_context(|| "Error getting connection host")?;
-        let pass = env::var("RABBITMQ_CONNECTION_PASS").unwrap_or("guest".to_string());
-        // .with_context(|| "Error getting connection host")?;
-        let jobs_queue_name = env::var("RABBITMQ_JOBS_QUEUE").unwrap_or("jobs_queue_1".to_string());
-        // .with_context(|| "Error getting jobs queue name")?;
+        let user = env::var("RABBITMQ_CONNECTION_USER")
+            .with_context(|| "Error getting connection host")?;
+        let pass = env::var("RABBITMQ_CONNECTION_PASS")
+            .with_context(|| "Error getting connection host")?;
+        let jobs_queue_name =
+            env::var("RABBITMQ_JOBS_QUEUE").with_context(|| "Error getting jobs queue name")?;
         Ok(Self {
             host,
             port,

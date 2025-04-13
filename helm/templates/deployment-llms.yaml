@@ -21,15 +21,20 @@ spec:
           env:
             - name: "RABBITMQ_CONNECTION_HOST"
               value: {{ .Values.rabbitmq.service.clusterIP | quote }}
-              # value: "http://{{ .Release.Name }}-rabbitmq-headless.{{ .Release.Namespace }}.svc.{{ .Values.rabbitmq.clusterDomain }}"
             - name: "RABBITMQ_CONNECTION_PORT"
               value: {{ .Values.rabbitmq.containerPorts.amqp | quote }}
             - name: "RABBITMQ_CONNECTION_USER"
               value: {{ .Values.rabbitmq.auth.username | quote }}
             - name: "RABBITMQ_CONNECTION_PASS"
               value: {{ .Values.rabbitmq.auth.password | quote }}
-            - name: "JOBS_QUEUE_NAME"
-              value: "{{ .Release.Name }}{{ .Values.general_config.jobs_queue_suffix }}"
+            - name: "RABBITMQ_JOBS_QUEUE"
+              value: {{ .Values.general_config.jobs_queue_name | quote }}
+            - name: "OLLAMA_HOST"
+              value: {{ .Values.llms.host | quote }}
+            - name: "OLLAMA_MODEL"
+              value: {{ .Values.llms.model | quote }}
+            - name: "REQUEST_TIMEOUT"
+              value: {{ .Values.general_config.request_timeout | quote }}
             - name: "RUST_LOG"
               value: {{ .Values.general_config.log_level | quote }}
         - name: "llm"
@@ -37,3 +42,9 @@ spec:
           imagePullPolicy: {{ .Values.images.pullPolicy | quote }}
           ports:
             - containerPort: 11434
+          resources:
+            requests:
+              cpu: {{ .Values.llms.cpu_request }}
+              memory: {{ .Values.llms.memory_request }}
+            limits:
+              cpu: {{ .Values.llms.cpu_limit }}
