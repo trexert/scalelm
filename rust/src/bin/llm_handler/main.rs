@@ -46,6 +46,8 @@ async fn main() {
 async fn setup_listener() -> anyhow::Result<QueueHandler> {
     trace!("setup_listener");
     let config = ConnectionConfig::from_env()?;
+    info!("Got config: {:?}", config);
+
     let connection = setup_connection(&config).await?;
     let channel = setup_channel(&connection).await?;
     setup_queue(&channel, &config.jobs_queue_name, false).await?;

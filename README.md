@@ -6,3 +6,6 @@
 - Could neaten up dependencies for smaller binaries
 - Make it possible to send error responses from llm handler to http frontend
 - More stuff could be configurable
+- No retrys on failed attempts to handle queue messages
+- More protection of RabbitMQ credentials
+- Better declaration/handling of required config for rust binaries

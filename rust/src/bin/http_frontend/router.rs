@@ -11,7 +11,7 @@ pub async fn serve_routes(queue_handler: QueueHandler) -> anyhow::Result<()> {
         .route("/api/generate", post(generate))
         .with_state(ServerState { queue_handler });
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:43196").await?;
     axum::serve(listener, app).await?;
 
     Ok(())

@@ -67,7 +67,7 @@ pub async fn setup_queue(
     Ok(())
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ConnectionConfig {
     pub host: String,
     pub port: u16,

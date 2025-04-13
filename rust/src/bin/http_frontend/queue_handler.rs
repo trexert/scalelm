@@ -1,5 +1,5 @@
 use core::str;
-use std::{collections::HashMap, env, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use amqprs::{
     BasicProperties, Deliver,
@@ -7,7 +7,6 @@ use amqprs::{
     connection::Connection,
     consumer::AsyncConsumer,
 };
-use anyhow::Context;
 use async_trait::async_trait;
 use scalelm::{
     ConnectionConfig, EXCHANGE, RequestMessage, ResponseMessage, setup_channel, setup_connection,
@@ -17,7 +16,8 @@ use tokio::{
     sync::{Mutex, oneshot},
     time::timeout,
 };
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
+use uuid::Uuid;
 
 const MESSAGE_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -33,11 +33,12 @@ pub struct QueueHandler {
 impl QueueHandler {
     pub async fn new() -> anyhow::Result<Self> {
         let config = ConnectionConfig::from_env()?;
+        info!("Got config: {:?}", config);
+
         let connection = setup_connection(&config).await?;
         let channel = setup_channel(&connection).await?;
 
-        let response_queue_name = env::var("RABBITMQ_RESPONSE_QUEUE")
-            .with_context(|| "Error getting response queue name")?;
+        let response_queue_name = format!("response_queue_{}", Uuid::new_v4());
         let jobs_queue_name = config.jobs_queue_name;
         setup_queue(&channel, &jobs_queue_name, false).await?;
         setup_queue(&channel, &response_queue_name, true).await?;

@@ -3,10 +3,10 @@ kind: Service
 metadata:
   name: "{{ .Release.Name }}-service"
 spec:
-  type: "NodePort"
+  type: {{ .Values.service.type | quote }}
   selector:
-    app: "llm"
+    app: "http-frontend"
   ports:
-    - port: 11434
-      targetPort: 11434
-      nodePort: 30434
+    - port: {{ .Values.service.internal_port }}
+      targetPort: {{ .Values.service.internal_port }}
+      nodePort: {{ .Values.service.port }}
